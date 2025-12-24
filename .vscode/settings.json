@@ -1,0 +1,24 @@
+{
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk-lualatex-no-bib",
+      "command": "latexmk",
+      "args": [
+        "-lualatex",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "-file-line-error",
+        "-synctex=1",
+        "-bibtex-",
+        "%DOC%"
+      ]
+    }
+  ],
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "latexmk (lualatex, no bib)",
+      "tools": ["latexmk-lualatex-no-bib"]
+    }
+  ],
+  "latex-workshop.latex.recipe.default": "latexmk (lualatex, no bib)"
+}

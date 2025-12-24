@@ -1,0 +1,65 @@
+````md
+# Доклад «Стохастическое моделирование» (SDE)
+
+Репозиторий с Beamer-презентацией (LuaLaTeX) и скриптами, которые генерируют все картинки и анимации (кадры) для доклада по курсу **математического моделирования**.
+
+**Тема:** стохастическое моделирование с акцентом на **стохастические дифференциальные уравнения (SDE)**.  
+**Автор:** Дмитрий Ластовецкий  
+**Преподаватель:** Кочевадов Виталий Алексеевич, доцент ИМ
+
+---
+
+## Что внутри
+
+- `main.tex` — слайды.
+- `figs/` — статичные картинки.
+- `figs/history/` — кадры для PDF-анимаций (`\animategraphics`) + вспомогательные картинки.
+- `scripts/`
+  - `make_history_figs.py` — генерирует все фигуры и кадры
+  - `make_gif.py` — (опционально) собирает GIF из кадров для превью
+
+⚠️ PDF-анимации из пакета `animate` чаще всего **не проигрываются в браузере (Chrome/Safari)**.  
+Для просмотра анимаций используйте **Adobe Acrobat Reader**.
+
+---
+
+## Быстрый запуск
+
+### 1) Python-зависимости
+```bash
+pip install -U numpy matplotlib pillow imageio
+````
+
+### 2) Сгенерировать картинки и кадры
+
+```bash
+python scripts/make_history_figs.py --frames 200
+```
+
+### 3) (Опционально) собрать GIF
+
+```bash
+python scripts/make_gif.py --fps 20
+```
+
+### 4) Собрать PDF (LuaLaTeX)
+
+```bash
+latexmk -pdf -lualatex -interaction=nonstopmode -halt-on-error main.tex
+```
+
+Очистка:
+
+```bash
+latexmk -C
+```
+
+---
+
+## Частые проблемы
+
+* **Анимация не работает в Chrome** — это нормально, попробуйте Adobe Acrobat Reader.
+* **`Package animate Error ... frame_000.png not found`** — имена кадров в `figs/history/...` должны совпадать с шаблоном в `\animategraphics`.
+* **Ошибка `\tfrac` в matplotlib** — заменяйте `\tfrac` на `\frac`.
+
+---

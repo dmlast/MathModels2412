@@ -1,0 +1,529 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{default}
+
+% !TeX program = lualatex
+\usepackage{fontspec}
+\defaultfontfeatures{Ligatures=TeX}
+
+\usepackage{polyglossia}
+\setmainlanguage{russian}
+\setotherlanguage{english}
+
+\setmainfont[Ligatures=TeX]{PT Serif}
+\setsansfont[Ligatures=TeX]{PT Sans}
+\setmonofont[Ligatures=TeX]{PT Mono}
+
+\newfontfamily\cyrillicfont[Ligatures=TeX]{PT Serif}
+\newfontfamily\cyrillicfontsf[Ligatures=TeX]{PT Sans}
+\newfontfamily\cyrillicfonttt[Ligatures=TeX]{PT Mono}
+
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\usepackage{animate}
+
+\graphicspath{{figs/}}
+
+\newcommand{\term}[1]{\textbf{#1}}
+\newcommand{\DefBlock}[2]{%
+\begin{block}{Определение: #1}
+#2
+\end{block}
+}
+
+\title[Стохастическое моделирование]{Стохастическое моделирование}
+\author{Дмитрий Ластовецкий}
+\institute{ИТМО \\ Курс: Методы математического моделирования \\ Преподаватель: Кочевадов Виталий Алексеевич, доцент ИМ}
+\date{\today}
+
+\begin{document}
+
+% ---------- 1 ----------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ---------- 2 ----------
+\begin{frame}{План доклада}
+\begin{enumerate}
+  \item История: от броуновского движения до diffusion models
+  \item Базовые понятия: случайный процесс, броуновское движение, SDE
+  \item Интуиция SDE: drift + diffusion и малые приращения
+  \item Кейсы:
+  \begin{itemize}
+    \item Финансы: GBM, распределение исходов, риск, стохастическая волатильность
+    \item ML: diffusion/score-based генерация как обратная динамика
+  \end{itemize}
+  \item Практика: симуляция (Euler--Maruyama), что извлекаем, калибровка, Bayes/SBI
+  \item Итоги и ограничения
+\end{enumerate}
+\end{frame}
+
+% ---------- 3 ----------
+\begin{frame}{История 1/5: Броуновское движение: случайность в физике}
+\begin{columns}
+\column{0.58\textwidth}
+\begin{itemize}
+  \item 1827: Роберт Броун наблюдает хаотическое движение частиц в жидкости
+  \item Поворот: это \term{не ошибка измерения}, а \term{физический механизм}
+  \item 1905: Эйнштейн связывает эффект с тепловым движением молекул
+  \item Интуиция: множество малых толчков $\Rightarrow$ видим ''случайную'' траекторию
+\end{itemize}
+
+\column{0.42\textwidth}
+\centering
+\animategraphics[
+  autoplay,loop,poster=first,width=\linewidth
+]{20}{figs/history/bm_anim/frame_}{0}{199}
+
+
+\vspace{0.3em}
+{\scriptsize Симуляция: частица + след траектории}
+\end{columns}
+\end{frame}
+
+% ---------- 4 ----------
+\begin{frame}{История 2/5: Винер --- модель ''шумной траектории''}
+\begin{columns}
+\column{0.60\textwidth}
+\begin{itemize}
+  \item 1923: Норберт Винер строит строгую модель броуновского движения
+  \item Получаем процесс $W_t$ с тремя ключевыми свойствами:
+  \begin{itemize}
+    \item независимые приращения
+    \item $W_{t+\Delta}-W_t \sim \mathcal{N}(0,\Delta)$
+    \item траектории непрерывны, но недифференцируемы
+  \end{itemize}
+  \item Это основа для SDE: $dW_t$ --- источник случайного импульса
+\end{itemize}
+
+\DefBlock{Винеровский процесс (Brownian motion)}{
+Процесс $W_t$ с $W_0=0$, независимыми приращениями и
+$W_{t+\Delta}-W_t\sim\mathcal{N}(0,\Delta)$.
+}
+
+\column{0.40\textwidth}
+\centering
+\animategraphics[autoplay,loop,width=\linewidth]{24}{figs/history/wiener_anim/frame_}{0}{199}
+
+\vspace{0.3em}
+{\scriptsize Несколько реализаций $W_t$}
+\end{columns}
+\end{frame}
+
+% ---------- 5 ----------
+\begin{frame}{История 3/5: Ито --- как считать функции от случайных траекторий}
+\begin{columns}
+\column{0.60\textwidth}
+\begin{itemize}
+  \item 1940-е: Киёси Ито вводит стохастический интеграл и \term{формулу Ито}
+  \item Интуиция: у броуновского движения есть \term{квадратичная вариация}
+  \[
+  \sum_k (W_{t_{k+1}}-W_{t_k})^2 \approx T
+  \]
+  \item Из-за этого в стохастике ''второй порядок'' не исчезает
+  \item Это даёт дополнительный член в замене переменных (''поправка Ито'')
+\end{itemize}
+
+
+\column{0.40\textwidth}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=\linewidth]{8}{figs/history/qv_anim/frame_}{0}{199}
+
+\vspace{0.3em}
+{\scriptsize Сходимость $\sum (\Delta W)^2 \to T$}
+\end{columns}
+\end{frame}
+
+% ---------- 6 ----------
+\begin{frame}{История 4/5: Финансы --- SDE}
+\begin{columns}
+\column{0.60\textwidth}
+\begin{itemize}
+  \item В финансах шум есть всегда: цены колеблются
+  \item Модельный шаг: относительные колебания $\Rightarrow$ GBM
+  \[
+  dS_t = \mu S_t\,dt + \sigma S_t\,dW_t
+  \]
+  \item 1973: Black--Scholes--Merton связывают SDE с хеджированием и ценой опциона
+  \item Вместо ''одной цены'' говорим про \term{распределение исходов} и риск
+\end{itemize}
+
+\DefBlock{GBM (Geometric Brownian Motion)}{
+$S_t>0$ и $dS_t=\mu S_t\,dt+\sigma S_t\,dW_t$.
+Эквивалентно: $\ln S_t$ --- броуновское движение с дрейфом.
+}
+
+\column{0.40\textwidth}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=\linewidth]{20}{figs/history/bs_anim/frame_}{0}{199}
+
+\vspace{0.3em}
+{\scriptsize ''Веер'' траекторий + payoff}
+\end{columns}
+\end{frame}
+
+% ---------- 7 ----------
+\begin{frame}{История 5/5: ML --- diffusion/score модели как SDE/ODE взгляд на генерацию}
+\begin{columns}
+\column{0.60\textwidth}
+\begin{itemize}
+  \item Forward diffusion: \term{портим данные шумом} $\Rightarrow$ близко к гауссовскому распределению
+  \item Reverse diffusion: если научиться \term{убирать шум по шагам}, можно генерировать из шумных данных
+  \item Score $\nabla_x \log p_t(x)$ --- локальное направление к областям высокой плотности
+  \item Мост: SDE (стохастика) и ODE (probability flow) описывают одну эволюцию $p_t$
+\end{itemize}
+
+\DefBlock{Score (для плотности)}{
+$\nabla_x \log p_t(x)$ --- градиент лог-плотности: направление, где плотность растёт быстрее всего.
+}
+
+\column{0.40\textwidth}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=\linewidth]{20}{figs/history/diffusion_anim/frame_}{0}{199}
+
+\vspace{0.3em}
+{\scriptsize data $\to$ noise $\to$ data}
+\end{columns}
+\end{frame}
+
+% DEFINITIONS
+% ---------- 8 ----------
+\begin{frame}{случайный процесс и ''много траекторий''}
+\DefBlock{Случайный процесс}{
+Семейство случайных величин $\{X_t\}_{t\ge0}$, индексированных временем.
+Одна реализация процесса --- это одна траектория $t\mapsto X_t(\omega)$.
+}
+\begin{itemize}
+  \item В детерминированных моделях обычно обсуждают одну траекторию
+  \item В стохастических моделях важны \term{распределения} и \term{семейства траекторий}
+  \item Поэтому прогноз чаще выглядит как квантили/вероятности, а не одно число
+\end{itemize}
+\end{frame}
+
+% ---------- 9 ----------
+\begin{frame}{Основная формула SDE: drift + diffusion}
+\[
+dX_t = a(X_t,t)\,dt + b(X_t,t)\,dW_t
+\]
+
+\DefBlock{Стохастическое дифференциальное уравнение (SDE)}{
+Уравнение, где изменение состояния содержит детерминированную часть ($dt$) и
+шумовую часть ($dW_t$).
+}
+
+\begin{itemize}
+  \item $a(\cdot)$ --- \term{drift}: куда система движется \emph{в среднем}
+  \item $b(\cdot)$ --- \term{diffusion}: насколько сильны случайные колебания
+  \item $dW_t$ --- случайный толчок масштаба $\sqrt{dt}$
+\end{itemize}
+\end{frame}
+
+% ---------- 10 ----------
+\begin{frame}{ODE vs SDE: что меняется в представлении}
+\begin{columns}
+\column{0.56\textwidth}
+\begin{itemize}
+  \item ODE: одна гладкая траектория, всё определяется начальными условиями
+  \item SDE: много траекторий при одинаковом старте
+  \item Вопросы: вероятности, квантили, доверительные интервалы, риск
+\end{itemize}
+
+\column{0.44\textwidth}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=\linewidth]{20}{figs/history/01_brownian_paths_anim/frame_}{0}{199}
+\end{columns}
+\end{frame}
+
+% ---------- 11 ----------
+\begin{frame}{Малые приращения}
+Пусть $\Delta t$ малое. Тогда интуитивно:
+\[
+X_{t+\Delta t} \approx X_t + a(X_t,t)\Delta t + b(X_t,t)\sqrt{\Delta t}\,\varepsilon,
+\quad \varepsilon \sim \mathcal{N}(0,1)
+\]
+\DefBlock{Шкала накопления}{
+drift накапливается как $\Delta t$, а шум --- как $\sqrt{\Delta t}$.
+}
+\begin{itemize}
+  \item Поэтому шум не исчезает, даже если шаг времени очень маленький
+  \item Это интуитивная причина, почему стохастика качественно отличается от ODE
+\end{itemize}
+\end{frame}
+
+% ---------- 12 ----------
+\begin{frame}{Базовый пример: Ornstein--Uhlenbeck (OU) --- возврат к среднему}
+\[
+dX_t = \kappa(\theta - X_t)\,dt + \sigma\,dW_t
+\]
+\DefBlock{OU-процесс}{
+Mean-reverting процесс: тянет к уровню $\theta$ со скоростью $\kappa$, плюс шум $\sigma$.
+}
+\begin{itemize}
+  \item $\theta$ --- ''уровень равновесия''
+  \item $\kappa$ --- сила возврата к $\theta$
+  \item $\sigma$ --- интенсивность флуктуаций
+\end{itemize}
+\end{frame}
+
+% ---------- 13 ----------
+\begin{frame}{OU как траектории: один закон --- много сценариев}
+\begin{columns}
+\column{0.55\textwidth}
+\begin{itemize}
+  \item больше $\sigma$ $\Rightarrow$ шире ''облако'' траекторий
+  \item больше $\kappa$ $\Rightarrow$ сильнее стягивание к $\theta$
+  \item модель описывает \term{распределение} траекторий
+\end{itemize}
+
+\column{0.45\textwidth}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=\linewidth]{20}{figs/history/02_ou_paths_anim/frame_}{0}{199}
+\end{columns}
+\end{frame}
+
+% FINANCE
+% ---------- 14 ----------
+\begin{frame}{Кейс 1 (финансы): GBM --- шум масштабируется ценой}
+\[
+dS_t = \mu S_t\,dt + \sigma S_t\,dW_t
+\]
+\begin{itemize}
+  \item относительные изменения (''в процентах'') часто стабильнее абсолютных
+  \item $\sigma S_t$: чем выше цена, тем больше абсолютные колебания
+  \item центральная идея: сценарии будущего и распределение $S_T$
+\end{itemize}
+
+\DefBlock{Параметры GBM}{
+$\mu$ --- средний темп роста (drift), $\sigma$ --- волатильность (diffusion).
+}
+\end{frame}
+
+% ---------- 15 ----------
+\begin{frame}{GBM: ''веер'' возможных будущих состояний}
+\begin{columns}
+\column{0.55\textwidth}
+\begin{itemize}
+  \item прогноз -- не одно число, а множество траекторий
+  \item дальше считаем: вероятности событий, квантили, метрики риска
+\end{itemize}
+
+\column{0.45\textwidth}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=\linewidth]{20}{figs/history/03_gbm_paths_anim/frame_}{0}{199}
+\end{columns}
+\end{frame}
+
+% ---------- 16 ----------
+\begin{frame}{Распределение результата: что важно для риска}
+\begin{columns}
+\column{0.55\textwidth}
+\DefBlock{VaR и ES}{
+\term{VaR}$_\alpha$ --- квантиль убытка уровня $\alpha$.
+\term{ES}$_\alpha$ --- средний убыток при условии, что убыток попал в худшие $(1-\alpha)$ случаев.
+}
+\begin{itemize}
+  \item важны вероятности событий: $P(S_T < L)$, квантили, хвосты
+  \item оцениваем по множеству симуляций (Monte Carlo)
+\end{itemize}
+
+\column{0.45\textwidth}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=\linewidth]{20}{figs/history/04_gbm_hist_anim/frame_}{0}{199}
+\end{columns}
+\end{frame}
+
+% ---------- 17 ----------
+\begin{frame}{Почему одной GBM часто мало: стохастическая волатильность}
+\begin{itemize}
+  \item рынки: ''толстые хвосты'', асимметрия, меняющаяся волатильность
+  \item \term{волатильность тоже процесс} (дополнительное состояние системы)
+\end{itemize}
+
+\vspace{0.6em}
+\DefBlock{Стохастическая волатильность (идея)}{
+Шум в цене зависит от скрытой величины $V_t$, которая сама эволюционирует со временем.
+}
+\[
+\begin{cases}
+dS_t = \mu S_t\,dt + \sqrt{V_t}\,S_t\,dW^{(1)}_t\\
+dV_t = \kappa(\theta - V_t)\,dt + \eta\,dW^{(2)}_t
+\end{cases}
+\]
+\end{frame}
+
+% DIFFUSION
+% ---------- 18 ----------
+\begin{frame}{Кейс 2 (ML): diffusion models --- динамика ''данные $\to$ шум''}
+\begin{itemize}
+  \item мы умеем портить данные: постепенно добавлять шум (forward процесс)
+  \item если научиться убирать шум ''по чуть-чуть'', можно генерировать из шума
+  \item интерпретация: генерация = \term{обратная динамика} распределений
+\end{itemize}
+
+\DefBlock{Diffusion-модель (интуитивно)}{
+Forward: делаем данные ''более гауссовскими''.
+Reverse: учимся шагами возвращаться обратно к данным.
+}
+\end{frame}
+
+% ---------- 19 ----------
+\begin{frame}{Forward diffusion: распределение становится проще}
+\begin{columns}
+\column{0.55\textwidth}
+\begin{itemize}
+  \item $p_0(x)$ сложно, многомодально
+  \item добавляем шум $\Rightarrow$ $p_t(x)$ сглаживается
+  \item в пределе получаем простое распределение (почти гауссовское)
+\end{itemize}
+
+\column{0.45\textwidth}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=\linewidth]{20}{figs/history/forward1d_anim/frame_}{0}{199}
+\end{columns}
+\end{frame}
+
+% ---------- 20 ----------
+\begin{frame}{Reverse diffusion: score как ''стрелка'' к областям высокой плотности}
+\DefBlock{Score}{
+$\nabla_x \log p_t(x)$ --- направление, где плотность $p_t(x)$ растёт быстрее всего.
+}
+\begin{itemize}
+  \item чтобы идти от шума к данным, нужен локальный ''указатель направления''
+  \item нейросеть учится предсказывать score $\Rightarrow$ получаем шаги обратной динамики
+\end{itemize}
+
+\vspace{0.4em}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=0.3\linewidth]{20}{figs/history/score_particles_anim/frame_}{0}{199}
+\end{frame}
+
+% ---------- 21 ----------
+\begin{frame}{SDE $\leftrightarrow$ ODE взгляд: probability flow}
+\begin{itemize}
+  \item иногда ту же эволюцию распределений $p_t$ можно описать детерминированной ODE
+  \item практический смысл:
+  \begin{itemize}
+    \item ускорение семплинга
+    \item иногда удобнее для вычисления правдоподобия/оценки плотности
+  \end{itemize}
+  \item разные траектории, но одно и то же семейство распределений
+\end{itemize}
+\end{frame}
+
+% PRACTICE
+% ---------- 22 ----------
+\begin{frame}{Практика: Euler--Maruyama и роль шага $\Delta t$}
+\begin{columns}
+\column{0.55\textwidth}
+\DefBlock{Euler--Maruyama}{
+Численная схема для SDE:
+$X_{k+1} = X_k + a(X_k,t_k)\Delta t + b(X_k,t_k)\sqrt{\Delta t}\,\varepsilon_k$,
+$\varepsilon_k\sim\mathcal{N}(0,1)$.
+}
+\begin{itemize}
+  \item меньше $\Delta t$ --- точнее, но дороже
+  \item больше $\Delta t$ --- быстрее, но больше ошибка дискретизации
+\end{itemize}
+
+\column{0.45\textwidth}
+\centering
+\animategraphics[autoplay,loop,poster=first,width=\linewidth]{10}{figs/history/em_refine_anim/frame_}{0}{199}
+\end{columns}
+\end{frame}
+
+% ---------- 23 ----------
+\begin{frame}{Что извлекаем из симуляции: вероятности, средние, интервалы}
+\DefBlock{Monte Carlo (идея)}{
+Считаем интересующие величины как среднее по множеству симулированных траекторий.
+Точность обычно растёт как $1/\sqrt{M}$.
+}
+\begin{itemize}
+  \item вероятность события:
+  \[
+  P(X_T \in A) \approx \frac{1}{M}\sum_{m=1}^{M}\mathbf{1}\{X_T^{(m)} \in A\}
+  \]
+  \item матожидание функционала:
+  \[
+  \mathbb{E}[g(X_T)] \approx \frac{1}{M}\sum_{m=1}^{M} g(X_T^{(m)})
+  \]
+  \item важно: всегда есть статистическая неопределённость (конечное $M$)
+\end{itemize}
+\end{frame}
+
+% ---------- 24 ----------
+\begin{frame}{Калибровка: как подобрать параметры SDE под данные}
+\begin{itemize}
+  \item наблюдаем $X_{t_0},X_{t_1},\dots$ дискретно (часто ещё и с шумом измерений)
+  \item хотим оценить параметры $\theta$ (например, $\kappa,\theta,\sigma$ в OU)
+  \item подходы:
+  \begin{itemize}
+    \item моменты / регрессии на приращениях -- дешево, но не точно
+    \item правдоподобие -- когда известно приближения плотностей перехода
+    \item симуляционные методы -- когда правдоподобие не получается найти; основной метод моделирования сегодня
+  \end{itemize}
+\end{itemize}
+
+\end{frame}
+
+% ---------- 25 ----------
+\begin{frame}{Bayesian взгляд и Simulation-Based Inference (SBI)}
+\DefBlock{Байесовский вывод}{
+Вместо одной оценки параметров имеем распределение $p(\theta\mid data)$.
+Это переносит неопределённость параметров в прогноз.
+}
+\begin{itemize}
+  \item Bayes: прогноз становится ''веером вееров''
+  \item когда правдоподобие сложно найти в явном виде:
+  \begin{itemize}
+    \item particle методы (фильтрация/сглаживание)
+    \item SBI: учим аппроксимацию постериора по симуляциям
+  \end{itemize}
+\end{itemize}
+
+\DefBlock{SBI (идея)}{
+Симулируем данные при разных $\theta$ и строим приближение к $p(\theta\mid data)$ без явного правдоподобия.
+}
+\end{frame}
+
+% ---------- 26 ----------
+\begin{frame}{Ограничения и итоги}
+\begin{columns}
+\column{0.52\textwidth}
+\term{Ограничения/риски:}
+\begin{itemize}
+  \item модельный риск (не та форма drift/diffusion)
+  \item идентифицируемость по дискретным данным
+  \item ошибка дискретизации, вычислительная цена
+\end{itemize}
+
+\column{0.48\textwidth}
+\term{Основные идеи:}
+\begin{enumerate}
+  \item SDE = drift + diffusion
+  \item прогноз = распределение и риск, а не одно число
+  \item SDE $\rightarrow$ diffusion models $\rightarrow$ Bayes/SBI
+\end{enumerate}
+\end{columns}
+
+\vspace{0.5em}
+\centering{\Large Спасибо за внимание!}
+\end{frame}
+
+% ---------- 27 ----------
+\begin{frame}{Further reading}
+\small
+\begin{itemize}
+  \item B. {\O}ksendal, \textit{Stochastic Differential Equations} 
+  \item S. S\"arkk\"a, A. Solin, \textit{Applied Stochastic Differential Equations} 
+  \item P. Kloeden, E. Platen, \textit{Numerical Solution of Stochastic Differential Equations} (численные методы)
+  \item I. Karatzas, S. Shreve, \textit{Brownian Motion and Stochastic Calculus}
+  \item Y. Song et al., \textit{Score-Based Generative Modeling through SDEs} (diffusion как SDE)
+\end{itemize}
+\end{frame}
+
+\end{document}
