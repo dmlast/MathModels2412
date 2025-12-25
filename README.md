@@ -38,10 +38,10 @@
 | Что показывает | Превью |
 |---|---|
 | Броуновская частица (траектория во времени) | ![](figs/history/brownian.gif) |
-| Винеровский процесс \(W_t\) (несколько траекторий) | ![](figs/history/wiener.gif) |
-| Квадратичная вариация \(\sum (\Delta W)^2 \to T\) (интуиция Ито) | ![](figs/history/ito_qv.gif) |
+| Винеровский процесс $W_t$ (несколько траекторий) | ![](figs/history/wiener.gif) |
+| Квадратичная вариация $\sum (\Delta W)^2 \to T$ (интуиция Ито) | ![](figs/history/ito_qv.gif) |
 | Black–Scholes/GBM «веер» траекторий | ![](figs/history/black_scholes.gif) |
-| Forward diffusion в 1D (распределение «упрощается» при росте \(\sigma\)) | ![](figs/history/diffusion.gif) |
+| Forward diffusion в 1D (распределение «упрощается» при росте $\sigma$) | ![](figs/history/diffusion.gif) |
 
 ---
 
