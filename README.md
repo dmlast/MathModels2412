@@ -100,12 +100,4 @@ latexmk -C
 
 * **Анимация не работает в Chrome** — это нормально, используйте **Adobe Acrobat Reader**.
 
-```
-::contentReference[oaicite:0]{index=0}
-```
-
-## Частые проблемы
-
-* **Анимация не работает в Chrome** — это нормально, попробуйте Adobe Acrobat Reader.
-
 ---
